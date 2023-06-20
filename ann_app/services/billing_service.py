@@ -114,7 +114,7 @@ class BeamProcessor:
         pipeline_options = PipelineOptions(streaming=True)
 
         with beam.Pipeline(options=pipeline_options) as pipeline:
-            pubsub_data = pipeline | beam.io.ReadFromPubSub(topic='projects/ikala-cloud-swe-dev-sandbox/topics/my-topic')
+            pubsub_data = pipeline | beam.io.ReadFromPubSub(topic='projects/project-id/topics/my-topic')
             # Print data 
             pubsub_data | beam.Map(print)
 

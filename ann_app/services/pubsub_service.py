@@ -4,7 +4,7 @@ from concurrent.futures import TimeoutError
 import random 
 import time
 
-project_id = 'ikala-cloud-swe-dev-sandbox'
+project_id = 'project-id'
 topic_id='my-topic'
 sub_id = 'my-sub'
 timeout = 20.0

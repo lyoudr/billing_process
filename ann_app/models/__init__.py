@@ -4,7 +4,7 @@ import os
 import sys
 
 
-# Add python path for ikala_billing_system/app packages
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../")))
 
 

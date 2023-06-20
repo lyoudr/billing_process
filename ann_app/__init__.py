@@ -15,7 +15,7 @@ app.register_blueprint(api.api)
 db = SQLAlchemy(app)
 # Initialize Swagger
 swagger = Swagger(app)
-# Add python path for ikala_billing_system/app packages
+
 current_dir = os.path.abspath(os.path.dirname(__file__))
 parent_dir = os.path.dirname(current_dir)
 
