@@ -3,7 +3,7 @@ from ann_app.models.billing import BillingReport
 
 from apache_beam.options.pipeline_options import PipelineOptions
 from apache_beam.transforms.window import FixedWindows
-from apache_beam.transforms.trigger import AfterProcessingTime, AccumulationMode
+from apache_beam.transforms.trigger import AfterWatermark, AfterAny, AccumulationMode, AfterProcessingTime
 import apache_beam as beam
 import csv 
 
@@ -52,24 +52,10 @@ class ParsePubSub(beam.DoFn):
         company = data[data.index('company') + 1]
         return [Bill(service, cost, company)]
 
-# Save data to database
-class SaveToDatabase(beam.DoFn):
-    def __init__(self, session):
-        self.session = session
-        
-    def process(self, data):
-        company, cost = data
-        billing_report = BillingReport(
-            company = company,
-            cost = cost,
-            dealing_fee = 0.0
-        )
-        self.session.add(billing_report)
 
 # Beam Processor class
 class BeamProcessor:
-
-    def save_billing_data_to_db(self, data, session=None):
+    def save_billing_data_to_db(self, data):
         with session_scope() as session:
             company, cost = data
             billing_report = BillingReport(
@@ -114,24 +100,27 @@ class BeamProcessor:
         pipeline_options = PipelineOptions(streaming=True)
 
         with beam.Pipeline(options=pipeline_options) as pipeline:
-            pubsub_data = pipeline | beam.io.ReadFromPubSub(topic='projects/project-id/topics/my-topic')
-            # Print data 
-            pubsub_data | beam.Map(print)
+            pubsub_data = pipeline | beam.io.ReadFromPubSub(topic='projects/your-project-id/topics/my-topic')
 
             parsed_data = (
                 # Apply the ParsePubSub ParDo function to parse the Pub/Sub data 
                 pubsub_data 
                 | "Parse Pub/Sub" >> beam.ParDo(ParsePubSub())
                 # Apply a fixed time-based windowing strategy of 1 s
-                | "Windowing" >> beam.WindowInto(FixedWindows(1*5))
+                | "Windowing" >> beam.WindowInto(
+                    FixedWindows(1*5) , 
+                    trigger=AfterAny(AfterWatermark( # A watermark is a guess as to when all data in a certain window is expected to have arrived. This is needed because data isn’t always guaranteed to arrive in a pipeline in time order, or to always arrive at predictable intervals.
+                        early=AfterProcessingTime(10),
+                        late=AfterProcessingTime(30)
+                    )),
+                    accumulation_mode=AccumulationMode.DISCARDING
+                )
                 | 'Group by Company' >> beam.Map(lambda billing: (billing.company, billing.cost))
                 | 'Combine' >> beam.CombinePerKey(sum)
                 | "Print Result" >> beam.Map(print)
-                | "Save to DB" >> beam.ParDo(SaveToDatabase(session=session))
             )
             
-            
-            # self.transform_and_save_data(parsed_data)
+
 
 
 

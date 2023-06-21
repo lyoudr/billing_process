@@ -4,7 +4,7 @@ from concurrent.futures import TimeoutError
 import random 
 import time
 
-project_id = 'project-id'
+project_id = 'your-project-id'
 topic_id='my-topic'
 sub_id = 'my-sub'
 timeout = 20.0
