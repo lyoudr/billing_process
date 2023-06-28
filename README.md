@@ -37,3 +37,23 @@ I am using Google's Map/Reduce and Apache Beam, a practical tool, to streamline 
 
 ## Impact
 By applying Map/Reduce to our billing counting system, we have significantly reduced the processing time for handling large volumes of data. The parallel processing capabilities of Map/Reduce allow for concurrent processing of billing data from different companies, resulting in faster and more efficient calculations.
+
+--- 
+## Start Service
+1. Create and Activate virtual environment
+```
+python3 -m venv ma_venv
+source ma_venv
+```
+2. Install required packages
+```
+pip install requirements.txt
+```
+3. Set google environment variable
+```
+export GOOGLE_APPLICATION_CREDENTIALS=/Users/apple/Code/Ann/master/service-account-key.json
+```
+4. Run the app
+```
+flask --app ann_app run --debug
+```
