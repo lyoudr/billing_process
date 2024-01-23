@@ -1,0 +1,10 @@
+The GNU 'hello' program (<https://www.gnu.org/software/hello/>) produces
+a familiar, friendly greeting.  It allows nonprogrammers to use a
+classic computer science tool which would otherwise be unavailable to
+them.  Because it is protected by the GNU General Public License, users
+are free (in perpetuity) to share and change it.
+
+   Not to spoil the joke, but of course the practical purpose of GNU
+Hello is to serve as a minimal example of a GNU package.  So, although
+most manuals don't need to discuss the implementation of the programs
+they document, that is part of the goal here.

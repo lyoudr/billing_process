@@ -1,12 +1,14 @@
 from ann_app.utils.db_session import session_scope
-from ann_app.models.billing import BillingReport
-
+from ann_app.models.billing import BillingReport, PubSubReport
+ 
 from apache_beam.options.pipeline_options import PipelineOptions
 from apache_beam.transforms.window import FixedWindows
 from apache_beam.transforms.trigger import AfterWatermark, AfterAny, AccumulationMode, AfterProcessingTime
+from apache_beam.io import WriteToText
 import apache_beam as beam
 import csv 
-
+import argparse
+import re 
 """
     1. Transforms:
         - Transforms are the operations in your pipeline, and provide a generic processing framework.
@@ -55,6 +57,7 @@ class ParsePubSub(beam.DoFn):
 
 # Beam Processor class
 class BeamProcessor:
+
     def save_billing_data_to_db(self, data):
         with session_scope() as session:
             company, cost = data
@@ -81,6 +84,16 @@ class BeamProcessor:
 
     # handle billing data
     def handle_csv_billing_data(self):
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            '--output',
+            dest='output',
+            # CHANGE 1/6: (OPTIONAL) The Google Cloud Storage path is required
+            # for outputting the results.
+            default='/Users/apple/Code/Ann/master/ann_app/services/output.csv',
+            help='Output file to write results to.'
+        )
+
         with beam.Pipeline() as pipeline:
             # Specify the CSV file path
             file_path = '/Users/apple/Code/Ann/master/ann_app/services/billing_report.csv'
@@ -93,33 +106,93 @@ class BeamProcessor:
 
             # Map/Reduce data, and save data
             self.transform_and_save_data(billing_data)
-            
+    
+    def element_to_tuple(self, element):
+        with session_scope() as session:
+            billing_report = PubSubReport(
+                company = element[0],
+                cost = element[1],
+                service = 'Cloud Run'
+            )
+            session.add(billing_report)
+        
 
     # handle pub/sub data
     def handle_pubsub_billing_data(self, session=None):
         pipeline_options = PipelineOptions(streaming=True)
-
+        
         with beam.Pipeline(options=pipeline_options) as pipeline:
-            pubsub_data = pipeline | beam.io.ReadFromPubSub(topic='projects/your-project-id/topics/my-topic')
+            pubsub_data = pipeline | beam.io.ReadFromPubSub(topic='projects/ikala-cloud-swe-dev-sandbox/topics/my-topic')
 
-            parsed_data = (
-                # Apply the ParsePubSub ParDo function to parse the Pub/Sub data 
-                pubsub_data 
-                | "Parse Pub/Sub" >> beam.ParDo(ParsePubSub())
+            # Apply the ParsePubSub ParDo function to parse the Pub/Sub data     
+            parsed_data = pubsub_data | "Parse Pub/Sub" >> beam.ParDo(ParsePubSub())
                 # Apply a fixed time-based windowing strategy of 1 s
-                | "Windowing" >> beam.WindowInto(
-                    FixedWindows(1*5) , 
-                    trigger=AfterAny(AfterWatermark( # A watermark is a guess as to when all data in a certain window is expected to have arrived. This is needed because data isn’t always guaranteed to arrive in a pipeline in time order, or to always arrive at predictable intervals.
-                        early=AfterProcessingTime(10),
-                        late=AfterProcessingTime(30)
-                    )),
-                    accumulation_mode=AccumulationMode.DISCARDING
-                )
-                | 'Group by Company' >> beam.Map(lambda billing: (billing.company, billing.cost))
-                | 'Combine' >> beam.CombinePerKey(sum)
-                | "Print Result" >> beam.Map(print)
+            window_data = parsed_data | "Windowing" >> beam.WindowInto(
+                FixedWindows(1*5) , 
+                trigger=AfterAny(AfterWatermark( # A watermark is a guess as to when all data in a certain window is expected to have arrived. This is needed because data isn’t always guaranteed to arrive in a pipeline in time order, or to always arrive at predictable intervals.
+                    early=AfterProcessingTime(10),
+                    late=AfterProcessingTime(30)
+                )),
+                accumulation_mode=AccumulationMode.DISCARDING
             )
-            
+            grouped_data = window_data | 'Group by Company' >> beam.Map(lambda billing: (billing.company, billing.cost))
+            combined_data = grouped_data | 'Combine' >> beam.CombinePerKey(sum)
+            combined_data | "Print Result" >> beam.Map(print)
+            combined_data | "Turn element to tuple" >> beam.Map(self.element_to_tuple)
+
+# handle word count
+def handle_word_count(argv=None, save_main_session=True):
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--input',
+        dest='input',
+        default='/Users/apple/Code/Ann/master/static/sample.txt', # gs://test_kd/sample.txt
+        help='Input file to process.'
+    )
+    parser.add_argument(
+        '--output',
+        dest='output',
+        # CHANGE 1/6: (OPTIONAL) The Google Cloud Storage path is required
+        # for outputting the results.
+        default='/Users/apple/Code/Ann/master/static/output.txt', # gs://test_kd/output.txt
+        help='Output file to write results to.'
+    )
+    known_args, pipeline_args = parser.parse_known_args(argv)
+    pipeline_options = PipelineOptions(pipeline_args)
+    with beam.Pipeline(options=pipeline_options) as p:
+        
+        # Read the text file[pattern] into a PCollection.
+        lines = p | beam.io.ReadFromText(known_args.input)
+
+        # Count the occurrences of each word.
+        counts = (
+            lines
+            | 'Split' >> (
+                beam.FlatMap(
+                    lambda x: re.findall(r'[A-Za-z\']+', x)
+                ).with_output_types(str)
+            )
+            | 'PairWithOne' >> beam.Map(lambda x: (x, 1))
+            | 'GroupAndSum' >> beam.CombinePerKey(sum)
+        )
+        # Format the counts into a PCollection of strings
+        def format_result(word_count):
+            (word, count) = word_count
+            return '%s: %s' % (word, count)
+
+        output = counts | 'Format' >> beam.Map(format_result)
+
+        # Write the output using a "Write" transform taht has side effects.
+        output | WriteToText(known_args.output)
+
+
+
+
+def main():
+    handle_word_count()
+
+if __name__ == '__main__':
+    main()
 
 
 

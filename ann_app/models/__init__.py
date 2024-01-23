@@ -20,4 +20,4 @@ meta = MetaData(
 )
 Base = declarative_base(metadata=meta)
 
-from .billing import BillingReport
+from .billing import BillingReport, PubSubReport

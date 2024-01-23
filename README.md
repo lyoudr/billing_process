@@ -57,3 +57,58 @@ export GOOGLE_APPLICATION_CREDENTIALS=/Users/apple/Code/Ann/master/service-accou
 ```
 flask --app ann_app run --debug
 ```
+
+---
+## Word Count Exampmle
+- ann_app.services.billing_service.BeamProcessor.handle_word_count
+```
+def handle_word_count(self, argv=None, save_main_session=True):
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            '--input',
+            dest='input',
+            default='/Users/apple/Code/Ann/master/static/sample.txt',
+            help='Input file to process.'
+        )
+        parser.add_argument(
+            '--output',
+            dest='output',
+            # CHANGE 1/6: (OPTIONAL) The Google Cloud Storage path is required
+            # for outputting the results.
+            default='/Users/apple/Code/Ann/master/static/output.txt',
+            help='Output file to write results to.'
+        )
+        known_args, pipeline_args = parser.parse_known_args(argv)
+        pipeline_options = PipelineOptions(pipeline_args)
+        with beam.Pipeline(options=pipeline_options) as p:
+            
+            # Read the text file[pattern] into a PCollection.
+            lines = p | beam.io.ReadFromText(known_args.input)
+
+            # Count the occurrences of each word.
+            counts = (
+                lines
+                | 'Split' >> (
+                    beam.FlatMap(
+                        lambda x: re.findall(r'[A-Za-z\']+', x)
+                    ).with_output_types(str)
+                )
+                | 'PairWithOne' >> beam.Map(lambda x: (x, 1))
+                | 'GroupAndSum' >> beam.CombinePerKey(sum)
+            )
+            # Format the counts into a PCollection of strings
+            def format_result(word_count):
+                (word, count) = word_count
+                return '%s: %s' % (word, count)
+
+            output = counts | 'Format' >> beam.Map(format_result)
+
+            # Write the output using a "Write" transform taht has side effects.
+            output | WriteToText(known_args.output)
+```
+
+- execute word count on local
+
+`
+python -m ann_app.services.billing_service
+`

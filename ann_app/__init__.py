@@ -22,7 +22,6 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.append(current_dir)
 sys.path.append(parent_dir)
 
-# return app
 
 
 if __name__ == "__main__":
