@@ -45,6 +45,8 @@ alembic==1.11.1
 flasgger==0.9.7.1
 google-cloud-pubsub==2.17.1
 SQLAlchemy==2.0.25
+pydantic==2.6.2
+pydantic_core==2.16.3
 # pyproject-toml==0.0.10
 # pip install --no-build-isolation fastavro==1.7.3
 # pip install setuptools wheel 'Cython<3'

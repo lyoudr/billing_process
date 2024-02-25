@@ -1,4 +1,4 @@
-from ann_app.models import Base
+from ann_app.db_models import Base
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config

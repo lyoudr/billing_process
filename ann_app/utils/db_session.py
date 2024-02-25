@@ -21,3 +21,14 @@ def session_scope():
             raise 
         finally:
             session.close()
+
+def get_db():
+    # Create SQLAlchemy engine
+    engine = create_engine(current_app.config["SQLALCHEMY_DATABASE_URI"])
+    # Create a session factory
+    Session = sessionmaker(bind=engine)
+    db = Session()
+    try:
+        yield db 
+    finally:
+        db.close()
